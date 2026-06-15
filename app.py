@@ -10,6 +10,12 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------
+# Initialize Session State for Shopping Cart
+# ---------------------------------------------------
+if "cart" not in st.session_state:
+    st.session_state.cart = {}  # Schema: { product_name: {"price": float, "qty": int} }
+
+# ---------------------------------------------------
 # Custom CSS
 # ---------------------------------------------------
 st.markdown("""
@@ -124,7 +130,7 @@ products = [
 ]
 
 # ---------------------------------------------------
-# Sidebar
+# Sidebar & Interactive Cart
 # ---------------------------------------------------
 st.sidebar.title("🛍️ MiniStore")
 
@@ -141,15 +147,37 @@ selected_category = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.subheader("🛒 Shopping Cart")
 
-st.sidebar.metric(
-    "Items",
-    3
-)
+# Calculate totals dynamically based on st.session_state.cart
+cart_items = st.session_state.cart
+total_items = sum(item["qty"] for item in cart_items.values())
+total_price = sum(item["price"] * item["qty"] for item in cart_items.values())
 
-st.sidebar.metric(
-    "Total",
-    "$224.97"
-)
+col_metrics1, col_metrics2 = st.sidebar.columns(2)
+col_metrics1.metric("Items", total_items)
+col_metrics2.metric("Total", f"${total_price:.2f}")
+
+# Display breakdown list of items inside the cart
+if total_items > 0:
+    st.sidebar.markdown("**Items Breakdown:**")
+    for name, info in list(cart_items.items()):
+        st.sidebar.caption(f"• {name} x{info['qty']} — ${info['price'] * info['qty']:.2f}")
+    
+    st.sidebar.markdown(" ")
+    
+    # Action Buttons: Clear & Checkout
+    col_clear, col_checkout = st.sidebar.columns(2)
+    
+    if col_clear.button("Clear Cart", use_container_width=True):
+        st.session_state.cart = {}
+        st.rerun()
+        
+    if col_checkout.button("💳 Checkout", type="primary", use_container_width=True):
+        st.balloons()
+        st.sidebar.success("🎉 Order placed successfully!")
+        st.session_state.cart = {}
+        st.rerun()
+else:
+    st.sidebar.info("Your cart is currently empty.")
 
 # ---------------------------------------------------
 # Filter Products
@@ -198,8 +226,19 @@ for i, product in enumerate(filtered_products):
             st.markdown(f'<div class="product-description">{product["description"]}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="product-price">${product["price"]}</div>', unsafe_allow_html=True)
             
-            # Button is now perfectly aligned inside the native card element
-            st.button("Add to Cart", key=f"cart_button_{i}", use_container_width=True)
+            # Interactive button functionality
+            if st.button("Add to Cart", key=f"cart_button_{i}", use_container_width=True):
+                p_name = product["name"]
+                p_price = product["price"]
+                
+                # Check if item exists in cart already, increase count or establish baseline
+                if p_name in st.session_state.cart:
+                    st.session_state.cart[p_name]["qty"] += 1
+                else:
+                    st.session_state.cart[p_name] = {"price": p_price, "qty": 1}
+                
+                # Force instant sidebar calculation update
+                st.rerun()
 
 # ---------------------------------------------------
 # Floating Support Button
